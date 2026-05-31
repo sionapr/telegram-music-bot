@@ -15,7 +15,6 @@ TOKEN = "8788976547:AAEVQZOqWCN4QfIDTxjzf1XMsoohcUT71WM"
 AUDD_API_KEY = "ed431a11304e9cab950560d4543debf1"
 
 bot = telebot.TeleBot(TOKEN)
-
 DOWNLOAD_PATH = "downloads"
 if not os.path.exists(DOWNLOAD_PATH):
     os.makedirs(DOWNLOAD_PATH)
@@ -123,7 +122,6 @@ def download_mp3(query):
         if file.startswith("song."):
             try: os.remove(os.path.join(DOWNLOAD_PATH, file))
             except: pass
-    # SoundCloud
     try:
         ydl_search = {'quiet': True, 'noplaylist': True}
         with yt_dlp.YoutubeDL(ydl_search) as ydl:
@@ -150,7 +148,6 @@ def download_mp3(query):
                         return f"{DOWNLOAD_PATH}/song.mp3"
     except Exception as e:
         print("[SC ERROR]", e)
-    # YouTube fallback
     try:
         ydl_opts = {
             'format':'bestaudio[ext=m4a]/bestaudio/best',
@@ -277,9 +274,21 @@ def process_music(message):
         bot.reply_to(message,"❌ خطا در پردازش")
 
 # =========================================
-# RUN
+# RUN (Poll + Conflict Fix)
 # =========================================
 
 print("🤖 Professional Music Bot Running...")
 print("⚠️ instagram_cookies.txt کنار bot.py باشد")
-bot.infinity_polling(timeout=60,long_polling_timeout=60)
+
+bot.remove_webhook()
+
+while True:
+    try:
+        print("🤖 Bot Started")
+        bot.infinity_polling(
+            timeout=60,
+            long_polling_timeout=60,
+            skip_pending=True
+        )
+    except Exception as e:
+        print("[POLLING ERROR]", e)
