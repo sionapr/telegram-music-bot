@@ -5,3 +5,4 @@ ShazamAPI
 requests
 ffmpeg-python
 instaloader
+requests
