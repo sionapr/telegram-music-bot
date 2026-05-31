@@ -1,0 +1,7 @@
+pyTelegramBotAPI
+yt-dlp
+pydub
+ShazamAPI
+requests
+ffmpeg-python
+instaloader
