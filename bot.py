@@ -1,7 +1,8 @@
+```python
 import telebot
 from telebot import types
 from ShazamAPI import Shazam
-from pydub import AudioSegment
+from pydub import AudioSegment, effects
 import yt_dlp
 import os
 import hashlib
@@ -96,7 +97,7 @@ def start(message):
 
     bot.send_message(
         message.chat.id,
-        "🔥 ربات حرفه‌ای روشن است\n\n"
+        "🔥 ربات حرفه‌ای تشخیص آهنگ روشن است\n\n"
         "از منو گزینه موردنظر را انتخاب کن",
         reply_markup=main_menu()
     )
@@ -111,11 +112,11 @@ def help_menu(message):
     bot.send_message(
         message.chat.id,
         "🎵 امکانات ربات:\n\n"
-        "• تشخیص آهنگ از ویس\n"
-        "• تشخیص آهنگ از ویدیو\n"
+        "• تشخیص حرفه‌ای آهنگ\n"
+        "• تشخیص از ویس و ویدیو\n"
         "• دانلود نسخه کامل آهنگ\n"
         "• دانلود ریلز اینستاگرام\n"
-        "• پشتیبانی فارسی و عربی"
+        "• دقت بسیار بالا"
     )
 
 # =========================================
@@ -144,7 +145,7 @@ def instagram_menu(message):
 
     bot.send_message(
         message.chat.id,
-        "🔗 لینک ریلز یا ویدیوی اینستاگرام رو بفرست",
+        "🔗 لینک ریلز یا ویدیوی اینستاگرام را بفرست",
         reply_markup=back_menu()
     )
 
@@ -172,6 +173,34 @@ def file_hash(path):
     with open(path, "rb") as f:
 
         return hashlib.md5(f.read()).hexdigest()
+
+# =========================================
+# CLEAN AUDIO
+# =========================================
+
+def clean_audio(input_file, output_file):
+
+    audio = AudioSegment.from_file(input_file)
+
+    # نرمال سازی حرفه‌ای
+    audio = effects.normalize(audio)
+
+    # حذف نویز
+    audio = audio.low_pass_filter(10000)
+    audio = audio.high_pass_filter(150)
+
+    # افزایش کیفیت
+    audio = audio.set_channels(2)
+    audio = audio.set_frame_rate(44100)
+
+    # افزایش حجم کمی
+    audio = audio + 5
+
+    audio.export(
+        output_file,
+        format="mp3",
+        bitrate="320k"
+    )
 
 # =========================================
 # DOWNLOAD SONG
@@ -207,7 +236,7 @@ def download_mp3(query):
         with yt_dlp.YoutubeDL(ydl_search) as ydl:
 
             info = ydl.extract_info(
-                f"scsearch5:{query}",
+                f"scsearch10:{query}",
                 download=False
             )
 
@@ -338,7 +367,6 @@ def download_instagram_video(url):
 
             'noplaylist': True,
 
-            # فقط اینستاگرام
             'cookiefile': 'instagram_cookies.txt',
 
             'http_headers': {
@@ -463,8 +491,12 @@ def process_music(message):
 
         bot.reply_to(
             message,
-            "🔍 درحال پردازش..."
+            "🔍 درحال پردازش حرفه‌ای..."
         )
+
+        # =====================================
+        # GET FILE
+        # =====================================
 
         if message.content_type == 'voice':
 
@@ -482,6 +514,10 @@ def process_music(message):
 
         downloaded = bot.download_file(file_info.file_path)
 
+        # =====================================
+        # CONVERT TO MP3
+        # =====================================
+
         if message.content_type == 'video':
 
             with open("video.mp4", "wb") as f:
@@ -489,7 +525,7 @@ def process_music(message):
                 f.write(downloaded)
 
             os.system(
-                'ffmpeg -y -i video.mp4 -vn -acodec mp3 music.mp3'
+                'ffmpeg -y -i video.mp4 -vn -acodec mp3 raw_music.mp3'
             )
 
             print("[CMD] Video -> MP3")
@@ -502,11 +538,33 @@ def process_music(message):
 
             audio = AudioSegment.from_file("voice.ogg")
 
-            audio.export("music.mp3", format="mp3")
+            audio.export(
+                "raw_music.mp3",
+                format="mp3"
+            )
 
             print("[CMD] Voice -> MP3")
 
+        # =====================================
+        # CLEAN AUDIO
+        # =====================================
+
+        clean_audio(
+            "raw_music.mp3",
+            "music.mp3"
+        )
+
+        print("[CMD] Audio Cleaned")
+
+        # =====================================
+        # HASH
+        # =====================================
+
         music_md5 = file_hash("music.mp3")
+
+        # =====================================
+        # CACHE
+        # =====================================
 
         if music_md5 in music_cache:
 
@@ -522,6 +580,10 @@ def process_music(message):
             print("[CACHE USED]")
 
             return
+
+        # =====================================
+        # SHAZAM
+        # =====================================
 
         with open("music.mp3", "rb") as f:
 
@@ -548,6 +610,10 @@ def process_music(message):
 
         print("[FOUND]", query)
 
+        # =====================================
+        # COVER
+        # =====================================
+
         cover = result[1]["track"]["images"]["coverart"]
 
         caption = (
@@ -562,6 +628,10 @@ def process_music(message):
             caption=caption
         )
 
+        # =====================================
+        # DOWNLOAD SONG
+        # =====================================
+
         mp3_path = download_mp3(query)
 
         if not mp3_path:
@@ -572,6 +642,10 @@ def process_music(message):
             )
 
             return
+
+        # =====================================
+        # SEND AUDIO
+        # =====================================
 
         with open(mp3_path, "rb") as audio:
 
@@ -584,10 +658,19 @@ def process_music(message):
 
         print("[DONE]")
 
+        # =====================================
+        # SAVE CACHE
+        # =====================================
+
         music_cache[music_md5] = mp3_path
+
+        # =====================================
+        # CLEAN
+        # =====================================
 
         for file in [
             "music.mp3",
+            "raw_music.mp3",
             "voice.ogg",
             "video.mp4"
         ]:
@@ -609,11 +692,11 @@ def process_music(message):
 # RUN
 # =========================================
 
-print("🤖 Professional Bot Running...")
-print("⚠️ Firefox را کامل ببند")
+print("🤖 Professional Music Bot Running...")
 print("⚠️ instagram_cookies.txt کنار bot.py باشد")
 
 bot.infinity_polling(
     timeout=60,
     long_polling_timeout=60
 )
+```
