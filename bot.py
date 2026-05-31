@@ -1,4 +1,5 @@
 import telebot
+import requests
 from telebot import types
 from ShazamAPI import Shazam
 from pydub import AudioSegment, effects
