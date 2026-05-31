@@ -271,8 +271,6 @@ def download_mp3(query):
 
             'quiet': False,
 
-            'cookiesfrombrowser': ('firefox',),
-
             'http_headers': {
 
                 'User-Agent': (
