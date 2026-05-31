@@ -1,21 +1,22 @@
 import telebot
 from telebot import types
-from pydub import AudioSegment, effects
+from ShazamAPI import Shazam
+from pydub import AudioSegment
 import yt_dlp
 import os
 import hashlib
 import threading
-import requests
 
 # =========================================
 # CONFIG
 # =========================================
 
 TOKEN = "8788976547:AAEVQZOqWCN4QfIDTxjzf1XMsoohcUT71WM"
-AUDD_API_KEY = "ed431a11304e9cab950560d4543debf1"
 
 bot = telebot.TeleBot(TOKEN)
+
 DOWNLOAD_PATH = "downloads"
+
 if not os.path.exists(DOWNLOAD_PATH):
     os.makedirs(DOWNLOAD_PATH)
 
@@ -24,7 +25,10 @@ if not os.path.exists(DOWNLOAD_PATH):
 # =========================================
 
 bot.set_my_commands([
-    telebot.types.BotCommand("start", "شروع ربات")
+    telebot.types.BotCommand(
+        "start",
+        "شروع ربات"
+    )
 ])
 
 # =========================================
@@ -32,6 +36,11 @@ bot.set_my_commands([
 # =========================================
 
 user_mode = {}
+
+# =========================================
+# CACHE
+# =========================================
+
 music_cache = {}
 
 # =========================================
@@ -39,256 +48,572 @@ music_cache = {}
 # =========================================
 
 def main_menu():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(
-        types.KeyboardButton("🎵 جستجوی آهنگ با ویدیو"),
-        types.KeyboardButton("📥 دانلود ریلز / ویدیو اینستاگرام"),
-        types.KeyboardButton("ℹ️ راهنما")
+
+    markup = types.ReplyKeyboardMarkup(
+        resize_keyboard=True
     )
+
+    btn1 = types.KeyboardButton(
+        "🎵 جستجوی آهنگ با ویدیو"
+    )
+
+    btn2 = types.KeyboardButton(
+        "📥 دانلود ریلز / ویدیو اینستاگرام"
+    )
+
+    btn3 = types.KeyboardButton(
+        "ℹ️ راهنما"
+    )
+
+    markup.add(btn1)
+    markup.add(btn2)
+    markup.add(btn3)
+
     return markup
 
 def back_menu():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton("🔙 بازگشت"))
+
+    markup = types.ReplyKeyboardMarkup(
+        resize_keyboard=True
+    )
+
+    btn = types.KeyboardButton(
+        "🔙 بازگشت"
+    )
+
+    markup.add(btn)
+
     return markup
 
 # =========================================
-# START / HELP
+# START
 # =========================================
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    user_mode[message.chat.id] = "menu"
-    bot.send_message(message.chat.id, "🔥 ربات حرفه‌ای روشن است\n\nاز منو گزینه موردنظر را انتخاب کن", reply_markup=main_menu())
 
-@bot.message_handler(func=lambda m: m.text == "ℹ️ راهنما")
-def help_menu(message):
-    bot.send_message(message.chat.id,
-        "🎵 امکانات ربات:\n"
-        "• تشخیص حرفه‌ای آهنگ\n"
-        "• تشخیص از ویس و ویدیو\n"
-        "• دانلود نسخه کامل آهنگ\n"
-        "• دانلود ریلز اینستاگرام\n"
-        "• دقت بسیار بالا"
+    user_mode[message.chat.id] = "menu"
+
+    bot.send_message(
+        message.chat.id,
+        "🔥 ربات حرفه‌ای روشن است\n\n"
+        "از منو گزینه موردنظر را انتخاب کن",
+        reply_markup=main_menu()
     )
 
 # =========================================
-# MUSIC / INSTAGRAM MENU
+# HELP
+# =========================================
+
+@bot.message_handler(func=lambda m: m.text == "ℹ️ راهنما")
+def help_menu(message):
+
+    bot.send_message(
+        message.chat.id,
+        "🎵 امکانات ربات:\n\n"
+        "• تشخیص آهنگ از ویس\n"
+        "• تشخیص آهنگ از ویدیو\n"
+        "• دانلود نسخه کامل آهنگ\n"
+        "• دانلود ریلز اینستاگرام\n"
+        "• پشتیبانی فارسی و عربی"
+    )
+
+# =========================================
+# MUSIC MENU
 # =========================================
 
 @bot.message_handler(func=lambda m: m.text == "🎵 جستجوی آهنگ با ویدیو")
 def music_menu(message):
+
     user_mode[message.chat.id] = "music"
-    bot.send_message(message.chat.id, "📥 حالا ویس، آهنگ یا ویدیو بفرست", reply_markup=back_menu())
+
+    bot.send_message(
+        message.chat.id,
+        "📥 حالا ویس، آهنگ یا ویدیو بفرست",
+        reply_markup=back_menu()
+    )
+
+# =========================================
+# INSTAGRAM MENU
+# =========================================
 
 @bot.message_handler(func=lambda m: m.text == "📥 دانلود ریلز / ویدیو اینستاگرام")
 def instagram_menu(message):
+
     user_mode[message.chat.id] = "instagram"
-    bot.send_message(message.chat.id, "🔗 لینک ریلز یا ویدیوی اینستاگرام را بفرست", reply_markup=back_menu())
+
+    bot.send_message(
+        message.chat.id,
+        "🔗 لینک ریلز یا ویدیوی اینستاگرام رو بفرست",
+        reply_markup=back_menu()
+    )
+
+# =========================================
+# BACK
+# =========================================
 
 @bot.message_handler(func=lambda m: m.text == "🔙 بازگشت")
 def back(message):
+
     user_mode[message.chat.id] = "menu"
-    bot.send_message(message.chat.id, "🏠 برگشتی به منوی اصلی", reply_markup=main_menu())
+
+    bot.send_message(
+        message.chat.id,
+        "🏠 برگشتی به منوی اصلی",
+        reply_markup=main_menu()
+    )
 
 # =========================================
 # HASH
 # =========================================
 
 def file_hash(path):
+
     with open(path, "rb") as f:
+
         return hashlib.md5(f.read()).hexdigest()
-
-# =========================================
-# CLEAN AUDIO
-# =========================================
-
-def clean_audio(input_file, output_file):
-    audio = AudioSegment.from_file(input_file)
-    audio = effects.normalize(audio)
-    audio = audio.low_pass_filter(10000)
-    audio = audio.high_pass_filter(150)
-    audio = audio.set_channels(2)
-    audio = audio.set_frame_rate(44100)
-    audio.export(output_file, format="mp3", bitrate="320k")
 
 # =========================================
 # DOWNLOAD SONG
 # =========================================
 
 def download_mp3(query):
+
     output_file = f"{DOWNLOAD_PATH}/song.%(ext)s"
+
+    # حذف فایل قبلی
     for file in os.listdir(DOWNLOAD_PATH):
+
         if file.startswith("song."):
-            try: os.remove(os.path.join(DOWNLOAD_PATH, file))
-            except: pass
+
+            try:
+                os.remove(os.path.join(DOWNLOAD_PATH, file))
+            except:
+                pass
+
+    # =====================================
+    # SOUNDCLOUD
+    # =====================================
+
     try:
-        ydl_search = {'quiet': True, 'noplaylist': True}
-        with yt_dlp.YoutubeDL(ydl_search) as ydl:
-            info = ydl.extract_info(f"scsearch10:{query}", download=False)
-            if info and "entries" in info:
-                for entry in info["entries"]:
-                    if not entry: continue
-                    title = str(entry.get("title","")).lower()
-                    if query.split()[0].lower() in title:
-                        link = entry["webpage_url"]
-                        ydl_opts = {
-                            'format':'bestaudio',
-                            'outtmpl':output_file,
-                            'noplaylist':True,
-                            'quiet':False,
-                            'postprocessors':[{
-                                'key':'FFmpegExtractAudio',
-                                'preferredcodec':'mp3',
-                                'preferredquality':'320'
-                            }]
-                        }
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl2:
-                            ydl2.download([link])
-                        return f"{DOWNLOAD_PATH}/song.mp3"
-    except Exception as e:
-        print("[SC ERROR]", e)
-    try:
-        ydl_opts = {
-            'format':'bestaudio[ext=m4a]/bestaudio/best',
-            'outtmpl':output_file,
-            'noplaylist':True,
-            'quiet':False,
-            'http_headers':{'User-Agent':'Mozilla/5.0'},
-            'extractor_args':{'youtube':{'player_client':['android','web']}},
-            'postprocessors':[{
-                'key':'FFmpegExtractAudio',
-                'preferredcodec':'mp3',
-                'preferredquality':'320'
-            }]
+
+        print("[CMD] SoundCloud Search")
+
+        ydl_search = {
+            'quiet': True,
+            'noplaylist': True,
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([f"ytsearch1:{query}"])
-        return f"{DOWNLOAD_PATH}/song.mp3"
+
+        with yt_dlp.YoutubeDL(ydl_search) as ydl:
+
+            info = ydl.extract_info(
+                f"scsearch5:{query}",
+                download=False
+            )
+
+            if info and "entries" in info:
+
+                for entry in info["entries"]:
+
+                    if not entry:
+                        continue
+
+                    title = str(entry.get("title", "")).lower()
+
+                    if query.split()[0].lower() in title:
+
+                        link = entry["webpage_url"]
+
+                        print("[SC FOUND]", link)
+
+                        ydl_opts = {
+
+                            'format': 'bestaudio',
+
+                            'outtmpl': output_file,
+
+                            'noplaylist': True,
+
+                            'quiet': False,
+
+                            'postprocessors': [{
+                                'key': 'FFmpegExtractAudio',
+                                'preferredcodec': 'mp3',
+                                'preferredquality': '320',
+                            }],
+                        }
+
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl2:
+
+                            ydl2.download([link])
+
+                        return f"{DOWNLOAD_PATH}/song.mp3"
+
     except Exception as e:
+
+        print("[SC ERROR]", e)
+
+    # =====================================
+    # YOUTUBE FALLBACK
+    # =====================================
+
+    try:
+
+        print("[CMD] YouTube Fallback")
+
+        ydl_opts = {
+
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+
+            'outtmpl': output_file,
+
+            'noplaylist': True,
+
+            'quiet': False,
+
+            'http_headers': {
+
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/137.0.0.0 Safari/537.36'
+                )
+            },
+
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            },
+
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320',
+            }],
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+            ydl.download([f"ytsearch1:{query}"])
+
+        print("[YT DOWNLOADED]")
+
+        return f"{DOWNLOAD_PATH}/song.mp3"
+
+    except Exception as e:
+
         print("[YT ERROR]", e)
+
     return None
 
 # =========================================
-# AUDD API
-# =========================================
-
-def recognize_song(file_path):
-    try:
-        with open(file_path,'rb') as f:
-            response = requests.post(
-                'https://api.audd.io/',
-                data={'api_token':AUDD_API_KEY,'return':'apple_music,spotify'},
-                files={'file':f}
-            )
-        result = response.json()
-        if result['status'] != 'success' or not result['result']: return None
-        return {"song":result['result']['title'], "artist":result['result']['artist']}
-    except Exception as e:
-        print("[AUDD ERROR]", e)
-        return None
-
-# =========================================
-# INSTAGRAM VIDEO
+# DOWNLOAD INSTAGRAM VIDEO
 # =========================================
 
 def download_instagram_video(url):
+
     try:
+
+        print("[CMD] Instagram Download")
+
         for file in os.listdir():
+
             if file.startswith("instagram_video"):
-                try: os.remove(file)
-                except: pass
+
+                try:
+                    os.remove(file)
+                except:
+                    pass
+
         ydl_opts = {
-            'outtmpl':'instagram_video.%(ext)s',
-            'format':'best',
-            'merge_output_format':'mp4',
-            'quiet':False,
-            'noplaylist':True,
-            'cookiefile':'instagram_cookies.txt',
-            'http_headers':{'User-Agent':'Mozilla/5.0','Referer':'https://www.instagram.com/'},
-            'nocheckcertificate':True
+
+            'outtmpl': 'instagram_video.%(ext)s',
+
+            'format': 'best',
+
+            'merge_output_format': 'mp4',
+
+            'quiet': False,
+
+            'noplaylist': True,
+
+            # فقط اینستاگرام
+            'cookiefile': 'instagram_cookies.txt',
+
+            'http_headers': {
+
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/137.0.0.0 Safari/537.36'
+                ),
+
+                'Referer': 'https://www.instagram.com/',
+            },
+
+            'nocheckcertificate': True,
         }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
             ydl.download([url])
+
         for file in os.listdir():
-            if file.startswith("instagram_video"): return file
+
+            if file.startswith("instagram_video"):
+
+                print("[IG SUCCESS]")
+
+                return file
+
     except Exception as e:
+
         print("[IG ERROR]", e)
+
     return None
 
-@bot.message_handler(func=lambda m: user_mode.get(m.chat.id)=="instagram")
+# =========================================
+# INSTAGRAM HANDLER
+# =========================================
+
+@bot.message_handler(func=lambda m: user_mode.get(m.chat.id) == "instagram")
 def instagram_download(message):
-    url = message.text
-    if "instagram.com" not in url:
-        bot.reply_to(message,"❌ لینک اینستاگرام نیست")
-        return
-    bot.reply_to(message,"⬇️ درحال دانلود ویدیو...")
-    video_path = download_instagram_video(url)
-    if not video_path: bot.reply_to(message,"❌ دانلود ناموفق بود"); return
-    with open(video_path,"rb") as v: bot.send_video(message.chat.id,v)
-    os.remove(video_path)
-    bot.send_message(message.chat.id,"✅ ویدیو ارسال شد")
+
+    try:
+
+        url = message.text
+
+        if "instagram.com" not in url:
+
+            bot.reply_to(
+                message,
+                "❌ لینک اینستاگرام نیست"
+            )
+
+            return
+
+        bot.reply_to(
+            message,
+            "⬇️ درحال دانلود ویدیو..."
+        )
+
+        video_path = download_instagram_video(url)
+
+        if not video_path:
+
+            bot.reply_to(
+                message,
+                "❌ دانلود ناموفق بود"
+            )
+
+            return
+
+        with open(video_path, "rb") as video:
+
+            bot.send_video(
+                message.chat.id,
+                video
+            )
+
+        os.remove(video_path)
+
+        bot.send_message(
+            message.chat.id,
+            "✅ ویدیو ارسال شد"
+        )
+
+    except Exception as e:
+
+        print("[IG ERROR]", e)
+
+        bot.reply_to(
+            message,
+            "❌ خطا در دانلود"
+        )
 
 # =========================================
 # MUSIC HANDLER
 # =========================================
 
-@bot.message_handler(content_types=['voice','audio','video'])
+@bot.message_handler(content_types=['voice', 'audio', 'video'])
 def recognize_music(message):
-    if user_mode.get(message.chat.id)!="music":
-        bot.reply_to(message,"❌ اول گزینه «جستجوی آهنگ با ویدیو» را بزن")
+
+    if user_mode.get(message.chat.id) != "music":
+
+        bot.reply_to(
+            message,
+            "❌ اول گزینه «جستجوی آهنگ با ویدیو» را بزن"
+        )
+
         return
-    threading.Thread(target=process_music,args=(message,)).start()
+
+    threading.Thread(
+        target=process_music,
+        args=(message,)
+    ).start()
+
+# =========================================
+# PROCESS MUSIC
+# =========================================
 
 def process_music(message):
+
     try:
-        bot.reply_to(message,"🔍 درحال پردازش حرفه‌ای...")
-        if message.content_type=='video': file_id=message.video.file_id
-        elif message.content_type=='audio': file_id=message.audio.file_id
-        else: file_id=message.voice.file_id
-        file_info=bot.get_file(file_id)
-        downloaded=bot.download_file(file_info.file_path)
-        if message.content_type=='video':
-            with open("video.mp4","wb") as f: f.write(downloaded)
-            os.system('ffmpeg -y -i video.mp4 -vn -acodec mp3 raw_music.mp3')
+
+        bot.reply_to(
+            message,
+            "🔍 درحال پردازش..."
+        )
+
+        if message.content_type == 'voice':
+
+            file_id = message.voice.file_id
+
+        elif message.content_type == 'audio':
+
+            file_id = message.audio.file_id
+
         else:
-            with open("voice.ogg","wb") as f: f.write(downloaded)
-            AudioSegment.from_file("voice.ogg").export("raw_music.mp3",format="mp3")
-        clean_audio("raw_music.mp3","music.mp3")
-        music_md5=file_hash("music.mp3")
+
+            file_id = message.video.file_id
+
+        file_info = bot.get_file(file_id)
+
+        downloaded = bot.download_file(file_info.file_path)
+
+        if message.content_type == 'video':
+
+            with open("video.mp4", "wb") as f:
+
+                f.write(downloaded)
+
+            os.system(
+                'ffmpeg -y -i video.mp4 -vn -acodec mp3 music.mp3'
+            )
+
+            print("[CMD] Video -> MP3")
+
+        else:
+
+            with open("voice.ogg", "wb") as f:
+
+                f.write(downloaded)
+
+            audio = AudioSegment.from_file("voice.ogg")
+
+            audio.export("music.mp3", format="mp3")
+
+            print("[CMD] Voice -> MP3")
+
+        music_md5 = file_hash("music.mp3")
+
         if music_md5 in music_cache:
-            with open(music_cache[music_md5],"rb") as a: bot.send_audio(message.chat.id,a); return
-        result=recognize_song("music.mp3")
-        if not result: bot.reply_to(message,"❌ آهنگ پیدا نشد"); return
-        song,artist=result["song"],result["artist"]
-        query=f"{song} {artist}"
-        bot.send_message(message.chat.id,f"🎵 {song}\n👤 {artist}\n⬇️ دانلود نسخه کامل...")
-        mp3_path=download_mp3(query)
-        if not mp3_path: bot.reply_to(message,"❌ دانلود ناموفق بود"); return
-        with open(mp3_path,"rb") as a: bot.send_audio(message.chat.id,a,title=song,performer=artist)
-        music_cache[music_md5]=mp3_path
-        for f in ["music.mp3","raw_music.mp3","voice.ogg","video.mp4"]:
-            if os.path.exists(f): os.remove(f)
+
+            cached_file = music_cache[music_md5]
+
+            with open(cached_file, "rb") as audio:
+
+                bot.send_audio(
+                    message.chat.id,
+                    audio
+                )
+
+            print("[CACHE USED]")
+
+            return
+
+        with open("music.mp3", "rb") as f:
+
+            shazam = Shazam(f.read())
+
+            recognize_generator = shazam.recognizeSong()
+
+            result = next(recognize_generator)
+
+        if not result[1] or "track" not in result[1]:
+
+            bot.reply_to(
+                message,
+                "❌ آهنگ پیدا نشد"
+            )
+
+            return
+
+        song = result[1]["track"]["title"]
+
+        artist = result[1]["track"]["subtitle"]
+
+        query = f"{song} {artist}"
+
+        print("[FOUND]", query)
+
+        cover = result[1]["track"]["images"]["coverart"]
+
+        caption = (
+            f"🎵 {song}\n"
+            f"👤 {artist}\n\n"
+            f"⬇️ دانلود نسخه کامل..."
+        )
+
+        bot.send_photo(
+            message.chat.id,
+            cover,
+            caption=caption
+        )
+
+        mp3_path = download_mp3(query)
+
+        if not mp3_path:
+
+            bot.reply_to(
+                message,
+                "❌ دانلود ناموفق بود"
+            )
+
+            return
+
+        with open(mp3_path, "rb") as audio:
+
+            bot.send_audio(
+                message.chat.id,
+                audio,
+                title=song,
+                performer=artist
+            )
+
+        print("[DONE]")
+
+        music_cache[music_md5] = mp3_path
+
+        for file in [
+            "music.mp3",
+            "voice.ogg",
+            "video.mp4"
+        ]:
+
+            if os.path.exists(file):
+
+                os.remove(file)
+
     except Exception as e:
-        print("[ERROR]",e)
-        bot.reply_to(message,"❌ خطا در پردازش")
+
+        print("[ERROR]", e)
+
+        bot.reply_to(
+            message,
+            "❌ خطا در پردازش"
+        )
 
 # =========================================
-# RUN (Poll + Conflict Fix)
+# RUN
 # =========================================
 
-print("🤖 Professional Music Bot Running...")
+print("🤖 Professional Bot Running...")
+print("⚠️ Firefox را کامل ببند")
 print("⚠️ instagram_cookies.txt کنار bot.py باشد")
 
-bot.remove_webhook()
-
-while True:
-    try:
-        print("🤖 Bot Started")
-        bot.infinity_polling(
-            timeout=60,
-            long_polling_timeout=60,
-            skip_pending=True
-        )
-    except Exception as e:
-        print("[POLLING ERROR]", e)
+bot.infinity_polling(
+    timeout=60,
+    long_polling_timeout=60
+)
